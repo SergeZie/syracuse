@@ -1,4 +1,7 @@
 syracuse
+
+
+
 We will be using PCL (Point Cloud Library) to deal with our point clouds and perform actions on them as well as to visualize the point clouds themselves.
 
 pcHandler class will handle the point cloud processing and includes functions such as: LoadPoints, Cluster, Slice and View according to all the different requirements.
