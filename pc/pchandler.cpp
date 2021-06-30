@@ -10,27 +10,36 @@ enum CameraAngle
 
 void pcHandler::initSideView()
 {
-    if(sideViewer)
-        return;
-    pcl::visualization::PCLVisualizer::Ptr viewSide(new pcl::visualization::PCLVisualizer("Side Viewer"));
     int distance = 40;
-    sideViewer = viewSide;
+    if(topViewer)
+    {
+        topViewer->setCameraPosition(0, -distance, 0, 0, 0, 1);
+        return;
+    }
+    pcl::visualization::PCLVisualizer::Ptr viewSide(new pcl::visualization::PCLVisualizer("Side Viewer"));
+    
+    topViewer = viewSide;
 
-    sideViewer->setBackgroundColor (0, 0, 0);
-    sideViewer->initCameraParameters();
-    sideViewer->setCameraPosition(0, -distance, 0, 0, 0, 1);
+    topViewer->setBackgroundColor (0, 0, 0);
+    topViewer->initCameraParameters();
+    topViewer->setCameraPosition(0, -distance, 0, 0, 0, 1);
 
-    sideViewer->addCoordinateSystem (1.0);
+    topViewer->addCoordinateSystem (1.0);
 }
 
 void pcHandler::initTopView()
 {
+    int distance = 40;
     if(topViewer)
+    {
+        topViewer->setCameraPosition(0, 0, distance, 1, 0, 1);
         return;
+    }
+        
 
     pcl::visualization::PCLVisualizer::Ptr viewTop(new pcl::visualization::PCLVisualizer("Top-Down Viewer"));
     topViewer = viewTop;
-    int distance = 40;
+ 
 
     topViewer->setBackgroundColor (0, 0, 0);
     topViewer->initCameraParameters();
@@ -39,7 +48,7 @@ void pcHandler::initTopView()
     topViewer->addCoordinateSystem (1.0);
 }
 
-pcHandler::pcHandler():topViewer(nullptr), sideViewer(nullptr)
+pcHandler::pcHandler():topViewer(nullptr)
 {
 }
 
@@ -57,7 +66,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::loadPoints(std::string filePath)
 
     // Make sure the file is open
     if(!myFile.is_open()) 
-        throw std::runtime_error("Could not open file");
+        throw std::runtime_error("Could not open file in function loadPoints");
 
     std::string line;
     // Iterate over all lines of the file, process the points and add them to the cloud.
@@ -107,6 +116,7 @@ inline void spinView(pcl::visualization::PCLVisualizer::Ptr viewer)
 
     viewer->removeAllPointClouds();
     viewer->removeAllShapes();
+    //viewer->close();
 }
 
 inline void batchView(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& clouds, pcl::visualization::PCLVisualizer::Ptr viewer, std::string name)
@@ -114,10 +124,10 @@ inline void batchView(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& clouds, 
     int i = 0;
     for(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud : clouds)
     {
-        Color colors[3] = {Color(1,0,0), Color(0,1,0), Color(0,0,1)};
+        Color colors[6] = {Color(1,0,0), Color(0,1,0), Color(0,0,1), Color(1,1,0), Color(0,1,1), Color(1,0,1)};
         std::string nameId = name + std::to_string(i);
         viewer->addPointCloud<pcl::PointXYZ>(cloud, nameId);
-        setupView(viewer, nameId, colors[i % 3]);
+        setupView(viewer, nameId, colors[i%6]);
         ++i;
         
     }
@@ -150,17 +160,17 @@ void pcHandler::viewSide(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
     Color color(0,0,1);
     initSideView();
-    sideViewer->addPointCloud<pcl::PointXYZ>(cloud, "Side view");
-    setupView(sideViewer, "Side view", color);
-    spinView(sideViewer);
+    topViewer->addPointCloud<pcl::PointXYZ>(cloud, "Side view");
+    setupView(topViewer, "Side view", color);
+    spinView(topViewer);
 }
 
 
 void pcHandler::viewSide(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& clouds)
 {
     initSideView();
-    batchView(clouds, sideViewer, "Batch Side viewer");
-    spinView(sideViewer);
+    batchView(clouds, topViewer, "Batch Side viewer");
+    spinView(topViewer);
 
 }
 
@@ -226,22 +236,24 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> pcHandler::cluster(const std::v
 }
 
 //Slice a plane according to a given point.
-pcl::PointCloud<pcl::PointXYZ>::Ptr slice(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointXYZ point)
+pcl::PointCloud<pcl::PointXYZ>::Ptr slice(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float& pointMin, const float& pointMax, const char* axis)
 {
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+    pcl::ConditionAnd<pcl::PointXYZ>::Ptr range_cond (new pcl::ConditionAnd<pcl::PointXYZ> ());
+
+    
+
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_projected(new pcl::PointCloud<pcl::PointXYZ>);
-    if(!coefficients || !cloud_projected)
+    if(!range_cond || !cloud_projected)
         throw std::runtime_error("Failed to allocate new object in 'slice'");
 
-    coefficients->values.resize (4);
-    coefficients->values[0] = point.x;
-    coefficients->values[1] = point.y;
-    coefficients->values[2] = point.z;
+    range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> (axis, pcl::ComparisonOps::GT, pointMin)));
+    range_cond->addComparison (pcl::FieldComparison<pcl::PointXYZ>::ConstPtr (new pcl::FieldComparison<pcl::PointXYZ> (axis, pcl::ComparisonOps::LT, pointMax)));
 
-    pcl::ProjectInliers<pcl::PointXYZ> proj;
-    proj.setModelType(pcl::SACMODEL_PLANE);
+
+    pcl::ConditionalRemoval<pcl::PointXYZ> proj;
+
     proj.setInputCloud(cloud);
-    proj.setModelCoefficients(coefficients);
+    proj.setCondition(range_cond);
     proj.filter(*cloud_projected);
 
     return cloud_projected;
@@ -249,51 +261,70 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr slice(pcl::PointCloud<pcl::PointXYZ>::Ptr cl
 
 
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceX(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float x)
+pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceX(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float& x1, const float& x2)
 {
-    return slice(cloud,pcl::PointXYZ(x,0,0));
+    const float min = x1 < x2 ? x1 : x2;
+    const float max = x1 >= x2 ? x1 : x2;
+
+    return slice(cloud,min,max,"x");
+
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceY(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float y)
+pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceY(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float& y1, const float& y2)
 {
-    return slice(cloud,pcl::PointXYZ(0,y,0));
+    const float min = y1 < y2 ? y1 : y2;
+    const float max = y1 >= y2 ? y1 : y2;
+
+    return slice(cloud,min,max,"y");
 }
 
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceZ(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float z)
+pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceZ(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float& z1, const float& z2)
 {
-    return slice(cloud,pcl::PointXYZ(0,0,z));
+    const float min = z1 < z2 ? z1 : z2;
+    const float max = z1 >= z2 ? z1 : z2;
+
+    return slice(cloud,min,max,"z");
 }
 
 
 //Concat the individual slices and return the big slice.
-pcl::PointCloud<pcl::PointXYZ>::Ptr sliceBatch(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, pcl::PointXYZ point)
+pcl::PointCloud<pcl::PointXYZ>::Ptr sliceBatch(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float pointMin, const float pointMax,const char* axis)
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr bigSlice(new pcl::PointCloud<pcl::PointXYZ>);
 
     for(auto cloud : clouds)
     {
-        *bigSlice += *slice(cloud,point);
+        *bigSlice += *slice(cloud,pointMin, pointMax, axis);
     }
     return bigSlice;
-}
-pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceX(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float x)
-{
-
-    return sliceBatch(clouds,pcl::PointXYZ(x,0,0));
 
 }
+pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceX(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float& x1, const float& x2)
+{
+    const float min = x1 < x2 ? x1 : x2;
+    const float max = x1 >= x2 ? x1 : x2;
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceY(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float y)
+    return sliceBatch(clouds,min,max,"x");
+
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceY(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float& y1, const float& y2)
 {
 
-    return sliceBatch(clouds,pcl::PointXYZ(0,y,0));
+    const float min = y1 < y2 ? y1 : y2;
+    const float max = y1 >= y2 ? y1 : y2;
+
+    return sliceBatch(clouds,min,max,"y");
 }
 
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceZ(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float z)
+pcl::PointCloud<pcl::PointXYZ>::Ptr pcHandler::sliceZ(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float& z1, const float& z2)
 {
-    return sliceBatch(clouds,pcl::PointXYZ(0,0,z));
+    const float min = z1 < z2 ? z1 : z2;
+    const float max = z1 >= z2 ? z1 : z2;
+
+    return sliceBatch(clouds,min,max,"z");
 }
 
 

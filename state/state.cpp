@@ -36,7 +36,7 @@ void stateHandler::loadState(std::string filePath)
 
     // Make sure the file is open
     if(!myFile.is_open()) 
-        throw std::runtime_error("Could not open file");
+        throw std::runtime_error("Could not open file in function loadState");
 
     std::string line;
     // Iterate over all lines of the file, process the points and add them to the cloud.

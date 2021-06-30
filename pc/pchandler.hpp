@@ -7,7 +7,7 @@
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/ModelCoefficients.h>
+#include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/project_inliers.h>
 
 struct Color
@@ -25,7 +25,7 @@ class pcHandler
 {
 
     pcl::visualization::PCLVisualizer::Ptr topViewer;
-    pcl::visualization::PCLVisualizer::Ptr sideViewer;
+
     
     void initSideView();
     void initTopView();
@@ -116,7 +116,7 @@ class pcHandler
     
     Slice a YZ plane at the given X point.
     */
-    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceX(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float x);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceX(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float& x1, const float& x2);
 
     /*
     function sliceY 
@@ -126,7 +126,7 @@ class pcHandler
     
     Slice a XZ plane at the given Y point.
     */
-    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceY(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float y);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceY(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float& y1, const float& y2);
 
 
     /*
@@ -137,16 +137,16 @@ class pcHandler
     
     Slice a XZ plane at the given Z point.
     */
-    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceZ(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float z);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceZ(const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, const float& z1, const float& z2);
 
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceX(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float x);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceX(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float& x1, const float& x2);
 
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceY(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float y);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceY(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float& y1, const float& y2);
 
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceZ(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float z);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr sliceZ(const std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds, const float& z1, const float& z2);
 
 
 
