@@ -25,16 +25,15 @@ int main()
     getcwd(tmp, 256);
     std::cout << tmp << std::endl;
 
-    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> batch;
+    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> batch; //This will hold our batch, if batch_size = 1 then we will only hold one element.
     int batch_size = 2; //Determines the size of the batch
 
 
 
-    for(int i=1; i <= NUM_FILES; i+=batch_size)
-    {
-        get_batch(statehandler, pchandler, batch, batch_size);
 
-        //Execute actions on the batch.
+        get_batch(statehandler, pchandler, batch, batch_size); //Get first batch
+
+        //Execute actions on the batch below.
 
 
         //Cluster
@@ -47,9 +46,16 @@ int main()
         auto slice2 = pchandler.sliceX(slice, 5,10); //Slice the previous slice from X=5 to X=10
         pchandler.viewTop(slice2);
 
+        get_batch(statehandler, pchandler, batch, batch_size); //Get next batch
 
 
-    }
+        //If you want to iterate over all batches or even some, you can do it in the loop.
+        for(int i=1; i < NUM_FILES / batch_size +1; ++i)
+        {
+            //Iterate over get_batch here
+            get_batch(statehandler, pchandler, batch, batch_size);
+        }
+
 
 }
 
@@ -64,13 +70,18 @@ void get_batch(stateHandler& statehandler, pcHandler& pchandler,std::vector<pcl:
     //Clear the batch of old/rogue elements.
     batch.erase(batch.begin(),batch.end());
 
-    for(int j=0; j<batch_size; ++j)
+    for(int j=batcher; j<batch_size+batcher; ++j)
     {
-        if(batcher+j >= NUM_FILES)
+        if(j >= NUM_FILES)
+        {
+            batcher = j;
+            std::cout <<"Reached last file" << std::endl;
             return; //This is to ensure we dont try to open non-existent files.
+        }
+            
 
         try{
-            statehandler.loadState(statePath + std::to_string(batcher+j) + ".csv");
+            statehandler.loadState(statePath + std::to_string(j) + ".csv");
 
             State changeState;
             changeState = statehandler.detectMotion();
@@ -80,7 +91,7 @@ void get_batch(stateHandler& statehandler, pcHandler& pchandler,std::vector<pcl:
                 Velocity vel = statehandler.detectVelocity();
             }
             //We only load clouds if detectVelocity did not throw an exception.
-            auto cloud = pchandler.loadPoints(framePath + std::to_string(batcher+j) + ".csv");
+            auto cloud = pchandler.loadPoints(framePath + std::to_string(j) + ".csv");
             batch.push_back(cloud);
 
         }catch(velocityAlert alert) //an exception indicating the velocity limit was exceeded has been raised.
